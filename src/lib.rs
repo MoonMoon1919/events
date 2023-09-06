@@ -1,3 +1,5 @@
+pub mod message_bus;
+
 use std::collections::HashMap;
 
 /// Events and subscribers
@@ -16,19 +18,25 @@ enum Event {
 type Subscriber = fn(Event);
 
 struct Publisher {
+    bus: message_bus::MessageBus,
     subscriptions: HashMap<Event, Vec<Subscriber>>
 }
 
 impl Publisher {
-    fn new(subscriptions: HashMap<Event, Vec<Subscriber>>) -> Self {
-        Publisher{ subscriptions }
+    fn new() -> Self {
+        Publisher{
+            bus: message_bus::MessageBus::new(),
+            subscriptions: HashMap::new(),
+        }
     }
 
     fn notify(&mut self, event: Event) {
         let subscribers = self.subscriptions.entry(event.clone()).or_default();
 
         for sub in subscribers {
-            sub(event.clone())
+            let s = sub.clone();
+            let e = event.clone();
+            self.bus.queue(move || { s(e) })
         }
     }
 
@@ -57,7 +65,7 @@ mod tests {
     #[test]
     fn notifies_subscribers() {
         let subscriptions: HashMap<Event, Vec<Subscriber>> = HashMap::new();
-        let mut publisher = Publisher::new(subscriptions);
+        let mut publisher = Publisher::new();
 
         publisher.subscribe(Event::SomeEvent, some_subscriber);
         publisher.subscribe(Event::SomeEvent, another_subscriber);
